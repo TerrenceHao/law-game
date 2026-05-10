@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>民事纠纷 · 老实人模拟</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Courier New', 'SimSun', monospace; background: #f5f2eb; display: flex; justify-content: center; align-items: center; height: 100vh; padding: 16px; }
+        .container { width: 100%; max-width: 750px; background: #fff; border: 1px solid #c0b7a8; display: flex; flex-direction: column; height: 90vh; }
+        .header { padding: 14px 20px; border-bottom: 1px solid #d4ccc0; font-weight: bold; background: #faf8f4; }
+        .log { flex: 1; overflow-y: auto; padding: 20px; line-height: 1.8; font-size: 0.95rem; }
+        .line { margin-bottom: 8px; }
+        .line.ai::before { content: "🧑‍🌾 当事人："; font-weight: bold; color: #5c4b31; }
+        .line.user::before { content: "⚖️ 律师："; font-weight: bold; color: #2d555b; }
+        .line.announce { color: #947d56; text-align: center; margin: 10px 0; font-style: italic; }
+        .line.error { color: #c0392b; }
+        .input-area { display: flex; padding: 10px 16px; border-top: 1px solid #d4ccc0; background: #faf8f4; }
+        textarea { flex: 1; resize: none; border: 1px solid #c0b7a8; padding: 10px; font-family: inherit; background: #fffefb; margin-right: 10px; }
+        button { padding: 10px 24px; background: #5c4b31; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button:disabled { background: #bcb09b; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">📋 民事纠纷当事人询问记录</div>
+    <div class="log" id="log">
+        <div class="line announce">当事人已到场，询问开始。</div>
+    </div>
+    <div class="input-area">
+        <textarea id="input" rows="1" placeholder="输入你的提问..." maxlength="400"></textarea>
+        <button id="sendBtn">发送</button>
+    </div>
+</div>
+
+<script>
+    // 请求同源的 Pages Function，无需写域名
+    const API_URL = '/api/chat';
+
+    const log = document.getElementById('log');
+    const input = document.getElementById('input');
+    const sendBtn = document.getElementById('sendBtn');
+
+    let history = [];
+    let gameOver = false;
+
+    function addLine(role, text) {
+        const div = document.createElement('div');
+        div.className = `line ${role}`;
+        div.textContent = text;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    async function sendMessage(userText) {
+        if (gameOver) return;
+
+        // 特殊指令
+        if (userText.trim() === '审判长，也就是我本人。') {
+            history.push({ role: 'user', content: userText });
+            try {
+                const resp = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages: history, max_tokens: 200 })
+                });
+                const data = await resp.json();
+                const reply = data.choices?.[0]?.message?.content || '（未收到回复）';
+                history.push({ role: 'assistant', content: reply });
+                addLine('ai', reply);
+                addLine('announce', '—— 当事人坦白，询问结束 ——');
+                gameOver = true;
+            } catch (e) {
+                addLine('error', '错误：' + e.message);
+            }
+            return;
+        }
+
+        // 普通对话
+        history.push({ role: 'user', content: userText });
+        addLine('user', userText);
+
+        try {
+            const resp = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: history,
+                    max_tokens: history.length <= 2 ? 200 : 80
+                })
+            });
+
+            if (!resp.ok) throw new Error('Worker返回错误 (' + resp.status + ')');
+            const data = await resp.json();
+            const reply = data.choices?.[0]?.message?.content;
+            if (!reply) throw new Error('模型返回空回复');
+
+            history.push({ role: 'assistant', content: reply });
+            addLine('ai', reply);
+
+            if (reply.includes('对对对') || reply.includes('就是这个')) {
+                addLine('announce', '—— 律师猜中，询问结束 ——');
+                gameOver = true;
+            }
+        } catch (e) {
+            addLine('error', '错误：' + e.message);
+            history.pop();
+        }
+    }
+
+    sendBtn.addEventListener('click', async () => {
+        const text = input.value.trim();
+        if (!text || gameOver) return;
+        input.value = '';
+        sendBtn.disabled = true;
+        await sendMessage(text);
+        if (!gameOver) sendBtn.disabled = false;
+        input.focus();
+    });
+
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendBtn.click();
+        }
+    });
+</script>
+</body>
+</html>
