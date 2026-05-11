@@ -11,7 +11,7 @@
         .header { padding: 14px 20px; border-bottom: 1px solid #d4ccc0; font-weight: bold; background: #faf8f4; }
         .log { flex: 1; overflow-y: auto; padding: 20px; line-height: 1.8; font-size: 0.95rem; }
         .line { margin-bottom: 8px; }
-        .line.ai::before { content: "👴 当事人："; font-weight: bold; color: #5c4b31; }
+        .line.ai::before { content: "👨‍🦳 当事人："; font-weight: bold; color: #5c4b31; }
         .line.user::before { content: "⚖️ 律师："; font-weight: bold; color: #2d555b; }
         .line.announce { color: #947d56; text-align: center; margin: 10px 0; font-style: italic; }
         .line.error { color: #c0392b; }
@@ -54,16 +54,15 @@
         const userText = input.value.trim();
         if (!userText || gameOver) return;
 
-        // 1. 立即显示用户消息
+        // 立即显示用户消息
         addLine('user', userText);
+        // 更新本地历史（用户消息）
+        history.push({ role: 'user', content: userText });
 
-        // 2. 禁用输入
+        // 禁用输入
         sendBtn.disabled = true;
         input.disabled = true;
         input.value = '';
-
-        // 3. 更新本地历史（用户消息）
-        history.push({ role: 'user', content: userText });
 
         try {
             const resp = await fetch(API_URL, {
@@ -80,12 +79,12 @@
             const data = await resp.json();
             const aiReply = data.aiReply || '（未收到回复）';
 
-            // 4. 显示 AI 回复
+            // 显示 AI 回复
             addLine('ai', aiReply);
-            // 5. 更新历史（加入 AI 回复）
+            // 本地历史加入 AI 回复
             history.push({ role: 'assistant', content: aiReply });
 
-            // 6. 检查后端返回的结束标志
+            // 处理结束状态
             if (data.gameOver) {
                 gameOver = true;
                 if (data.endType === 'judge') {
@@ -98,7 +97,7 @@
             }
         } catch (e) {
             addLine('error', '错误：' + e.message);
-            // 错误时回滚最后一条用户消息（可选）
+            // 回滚用户消息（因出错未能完成对话）
             history.pop();
         } finally {
             if (!gameOver) {
