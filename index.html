@@ -39,7 +39,6 @@
     const input = document.getElementById('input');
     const sendBtn = document.getElementById('sendBtn');
 
-    // 对话历史完全由后端返回，前端只缓存
     let history = [];
     let gameOver = false;
 
@@ -51,37 +50,26 @@
         log.scrollTop = log.scrollHeight;
     }
 
-    function renderHistory(messages) {
-        // 清空日志（保留初始提示不在此处，但简单做法：清空所有行，重新渲染）
-        log.innerHTML = '';
-        if (messages.length === 0) {
-            log.innerHTML = '<div class="line announce">当事人已到场，询问开始。</div>';
-            return;
-        }
-        for (const msg of messages) {
-            const role = msg.role === 'user' ? 'user' : 'ai';
-            addLine(role, msg.content);
-        }
-    }
-
     async function sendMessage() {
         const userText = input.value.trim();
         if (!userText || gameOver) return;
 
-        // 立即禁用输入，防止重复发送
+        // 1. 立即显示用户消息
+        addLine('user', userText);
+
+        // 2. 禁用输入
         sendBtn.disabled = true;
         input.disabled = true;
         input.value = '';
 
-        // 发送当前历史 + 新问题
+        // 3. 更新本地历史（用户消息）
+        history.push({ role: 'user', content: userText });
+
         try {
             const resp = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    history: history,
-                    question: userText
-                })
+                body: JSON.stringify({ history, question: userText })
             });
 
             if (!resp.ok) {
@@ -90,18 +78,19 @@
             }
 
             const data = await resp.json();
-            // 用后端返回的完整历史替换本地
-            history = data.history || [];
-            // 重新渲染全部对话
-            renderHistory(history);
+            const aiReply = data.aiReply || '（未收到回复）';
 
-            // 处理结束状态
+            // 4. 显示 AI 回复
+            addLine('ai', aiReply);
+            // 5. 更新历史（加入 AI 回复）
+            history.push({ role: 'assistant', content: aiReply });
+
+            // 6. 检查后端返回的结束标志
             if (data.gameOver) {
                 gameOver = true;
-                const endType = data.endType; // 'judge' 或 'guess'
-                if (endType === 'judge') {
+                if (data.endType === 'judge') {
                     addLine('announce', '—— 当事人坦白，询问结束 ——');
-                } else if (endType === 'guess') {
+                } else if (data.endType === 'guess') {
                     addLine('announce', '—— 律师猜中，询问结束 ——');
                 }
                 sendBtn.disabled = true;
@@ -109,7 +98,8 @@
             }
         } catch (e) {
             addLine('error', '错误：' + e.message);
-            // 出错时尝试回滚历史 (简单起见，忽略)
+            // 错误时回滚最后一条用户消息（可选）
+            history.pop();
         } finally {
             if (!gameOver) {
                 sendBtn.disabled = false;
