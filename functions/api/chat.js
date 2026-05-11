@@ -36,7 +36,7 @@ export async function onRequest(context) {
   let endType = null;
 
   // 先判断审判长指令，即使后续API调用失败也要结束
-  if (question.trim() === '审判长，也就是我本人。') {
+ if (question.trim() === '审判长，也就是我本人。' || question.trim() === '审判长，也就是我本人') {
     gameOver = true;
     endType = 'judge';   // 当事人坦白
   }
