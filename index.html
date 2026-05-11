@@ -53,46 +53,37 @@
     async function sendMessage() {
         const userText = input.value.trim();
         if (!userText || gameOver) return;
-        // ===== 新增初始化逻辑 =====
-        if (history.length === 0) {
-            // 第一轮对话，先让当事人打个招呼，锁定背景
-            const initMessage = "唉，律师您可算来了，我这心里憋屈得很，您问吧……";
-            addLine('ai', initMessage);
-            history.push({ role: 'assistant', content: initMessage });
-        }
-        // ===== 新增逻辑结束 =====
-
-
+    
         // 立即显示用户消息
         addLine('user', userText);
         // 更新本地历史（用户消息）
         history.push({ role: 'user', content: userText });
-
+    
         // 禁用输入
         sendBtn.disabled = true;
         input.disabled = true;
         input.value = '';
-
+    
         try {
             const resp = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ history, question: userText })
             });
-
+    
             if (!resp.ok) {
                 const errText = await resp.text();
                 throw new Error(`状态 ${resp.status}: ${errText}`);
             }
-
+    
             const data = await resp.json();
             const aiReply = data.aiReply || '（未收到回复）';
-
+    
             // 显示 AI 回复
             addLine('ai', aiReply);
             // 本地历史加入 AI 回复
             history.push({ role: 'assistant', content: aiReply });
-
+    
             // 处理结束状态
             if (data.gameOver) {
                 gameOver = true;
@@ -106,8 +97,7 @@
             }
         } catch (e) {
             addLine('error', '错误：' + e.message);
-            // 回滚用户消息（因出错未能完成对话）
-            history.pop();
+            history.pop(); // 回滚
         } finally {
             if (!gameOver) {
                 sendBtn.disabled = false;
