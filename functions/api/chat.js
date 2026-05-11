@@ -9,7 +9,7 @@ export async function onRequest(context) {
       return new Response('服务端配置缺失', { status: 500 });
     }
 
-    // 2. 解析表单或GET请求
+    // 2. 解析表单
     let userQuestion = '';
     let history = [];
     if (request.method === 'POST') {
@@ -17,18 +17,16 @@ export async function onRequest(context) {
       userQuestion = (formData.get('question') || '').trim();
       const rawHistory = formData.get('history') || '';
       if (rawHistory) {
-        try {
-          history = JSON.parse(rawHistory);
-        } catch (e) {}
+        try { history = JSON.parse(rawHistory); } catch (e) {}
       }
     }
 
-    // 3. 调用AI并生成新历史
+    // 3. 调用 AI，并更新历史
     let aiReply = '';
     let gameOver = false;
     if (userQuestion) {
       const messages = [
-        { role: 'suser', content: systemPrompt },
+        { role: 'system', content: systemPrompt },   // ✅ 修正为 system
         ...history,
         { role: 'user', content: userQuestion }
       ];
@@ -49,7 +47,8 @@ export async function onRequest(context) {
           })
         });
         const data = await resp.json();
-        aiReply = data.choices?.[0]?.message?.content || '（未收到回复）';
+        aiReply = data.choices?.[0]?.message?.content || '';
+        if (!aiReply) aiReply = '……（当事人沉默不语）'; // 防止空回复
         history.push({ role: 'user', content: userQuestion });
         history.push({ role: 'assistant', content: aiReply });
       } catch (e) {
@@ -58,7 +57,7 @@ export async function onRequest(context) {
         history.push({ role: 'assistant', content: aiReply });
       }
 
-      // 4. 检查胜利条件
+      // 4. 判断胜利条件
       if (userQuestion === '审判长，也就是我本人。') {
         gameOver = true;
       } else if (aiReply.includes('对对对') || aiReply.includes('就是这个') || aiReply.includes('律师您太厉害了')) {
@@ -66,7 +65,7 @@ export async function onRequest(context) {
       }
     }
 
-    // 5. 构建HTML
+    // 5. 生成对话 HTML
     let chatHtml = '';
     for (const msg of history) {
       const role = msg.role === 'user' ? '⚖️ 律师' : '🧑‍🌾 当事人';
@@ -88,6 +87,7 @@ export async function onRequest(context) {
       </div>`;
     }
 
+    // 6. 返回完整页面
     const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -122,7 +122,6 @@ export async function onRequest(context) {
     });
 
   } catch (err) {
-    // 最外层兜底：任何未捕获的异常都返回一个简单错误页
     return new Response(`<html><body><h3>抱歉，页面遇到错误</h3><p>请稍后重试。</p></body></html>`, {
       status: 500,
       headers: { 'Content-Type': 'text/html; charset=utf-8' }
