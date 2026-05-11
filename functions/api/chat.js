@@ -26,7 +26,6 @@ export async function onRequest(context) {
     return new Response(JSON.stringify({ error: '问题不能为空' }), { status: 400 });
   }
 
-  // 拼接完整消息（history 已经包含了用户刚刚发的那条，所以直接加 system prompt 即可）
   const messages = [
     { role: 'system', content: systemPrompt },
     ...history
@@ -63,13 +62,13 @@ export async function onRequest(context) {
     aiReply = '调用AI服务失败，请稍后重试。';
   }
 
-  // 判断结束条件
+  // 结束条件判断（审判长最优先）
   if (question.trim() === '审判长，也就是我本人。') {
     gameOver = true;
-    endType = 'judge';   // 当事人坦白
+    endType = 'judge';      // 当事人坦白
   } else if (aiReply.includes('对对对') || aiReply.includes('就是这个') || aiReply.includes('律师您太厉害了')) {
     gameOver = true;
-    endType = 'guess';   // 律师猜中
+    endType = 'guess';      // 律师猜中
   }
 
   return new Response(JSON.stringify({
