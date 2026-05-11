@@ -26,6 +26,7 @@ export async function onRequest(context) {
     return new Response(JSON.stringify({ error: '问题不能为空' }), { status: 400 });
   }
 
+  // 构造完整消息（history 已经包含了用户刚发的那条）
   const messages = [
     { role: 'system', content: systemPrompt },
     ...history
@@ -62,13 +63,17 @@ export async function onRequest(context) {
     aiReply = '调用AI服务失败，请稍后重试。';
   }
 
-  // 结束条件判断（审判长最优先）
+  // 🎯 关键：先检测是否为审判长指令，再检测认输关键词
   if (question.trim() === '审判长，也就是我本人。') {
     gameOver = true;
-    endType = 'judge';      // 当事人坦白
-  } else if (aiReply.includes('对对对') || aiReply.includes('就是这个') || aiReply.includes('律师您太厉害了')) {
+    endType = 'judge';   // 当事人坦白
+  } else if (
+    aiReply.includes('对对对') ||
+    aiReply.includes('就是这个') ||
+    aiReply.includes('律师您太厉害了')
+  ) {
     gameOver = true;
-    endType = 'guess';      // 律师猜中
+    endType = 'guess';   // 律师猜中
   }
 
   return new Response(JSON.stringify({
