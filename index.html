@@ -53,6 +53,15 @@
     async function sendMessage() {
         const userText = input.value.trim();
         if (!userText || gameOver) return;
+        // ===== 新增初始化逻辑 =====
+        if (history.length === 0) {
+            // 第一轮对话，先让当事人打个招呼，锁定背景
+            const initMessage = "唉，律师您可算来了，我这心里憋屈得很，您问吧……";
+            addLine('ai', initMessage);
+            history.push({ role: 'assistant', content: initMessage });
+        }
+        // ===== 新增逻辑结束 =====
+
 
         // 立即显示用户消息
         addLine('user', userText);
