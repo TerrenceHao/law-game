@@ -35,6 +35,12 @@ export async function onRequest(context) {
   let gameOver = false;
   let endType = null;
 
+  // 先判断审判长指令，即使后续API调用失败也要结束
+  if (question.trim() === '审判长，也就是我本人。') {
+    gameOver = true;
+    endType = 'judge';   // 当事人坦白
+  }
+
   try {
     const resp = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
       method: 'POST',
@@ -59,18 +65,20 @@ export async function onRequest(context) {
     const data = await resp.json();
     aiReply = data.choices?.[0]?.message?.content || '';
   } catch (e) {
-    aiReply = '调用AI服务失败，请稍后重试。';
+    // 若API调用失败，根据情况返回不同提示
+    if (gameOver) {
+      aiReply = '好吧，我坦白……（因网络波动，坦白内容丢失，但询问结束）';
+    } else {
+      aiReply = '调用AI服务失败，请稍后重试。';
+    }
   }
 
-  // 核心互锁判断：律师说“我本人”优先于当事人的“对对对”
-  if (question.trim() === '审判长，也就是我本人。') {
-    gameOver = true;
-    endType = 'judge';   // 当事人坦白
-  } else if (
+  // 如果不是审判长，但AI回复中有认输词，则标记猜中结束
+  if (!gameOver && (
     aiReply.includes('对对对') ||
     aiReply.includes('就是这个') ||
     aiReply.includes('律师您太厉害了')
-  ) {
+  )) {
     gameOver = true;
     endType = 'guess';   // 律师猜中
   }
