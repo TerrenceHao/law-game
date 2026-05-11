@@ -1,7 +1,6 @@
 export async function onRequest(context) {
   const { request, env } = context;
 
-  // 1. 只允许 POST
   if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
       status: 405,
@@ -9,14 +8,12 @@ export async function onRequest(context) {
     });
   }
 
-  // 2. 检查环境变量
   const apiKey = env.SILICON_API_KEY;
   const systemPrompt = env.SYSTEM_PROMPT;
   if (!apiKey || !systemPrompt) {
     return new Response(JSON.stringify({ error: '服务端配置缺失' }), { status: 500 });
   }
 
-  // 3. 解析请求体
   let body;
   try {
     body = await request.json();
@@ -29,18 +26,16 @@ export async function onRequest(context) {
     return new Response(JSON.stringify({ error: '问题不能为空' }), { status: 400 });
   }
 
-  // 4. 构造完整的消息列表（加入 system prompt）
+  // 拼接完整消息（history 已经包含了用户刚刚发的那条，所以直接加 system prompt 即可）
   const messages = [
     { role: 'system', content: systemPrompt },
-    ...history,
-    { role: 'user', content: question }
+    ...history
   ];
 
   let aiReply = '';
   let gameOver = false;
-  let endType = null; // 'judge' 或 'guess'
+  let endType = null;
 
-  // 5. 调用硅基流动
   try {
     const resp = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
       method: 'POST',
@@ -65,18 +60,10 @@ export async function onRequest(context) {
     const data = await resp.json();
     aiReply = data.choices?.[0]?.message?.content || '';
   } catch (e) {
-    // 调用失败时，返回错误信息给前端
     aiReply = '调用AI服务失败，请稍后重试。';
   }
 
-  // 6. 更新对话历史，并检查结束条件
-  const newHistory = [
-    ...history,
-    { role: 'user', content: question },
-    { role: 'assistant', content: aiReply }
-  ];
-
-  // 特殊指令优先判断
+  // 判断结束条件
   if (question.trim() === '审判长，也就是我本人。') {
     gameOver = true;
     endType = 'judge';   // 当事人坦白
@@ -85,12 +72,10 @@ export async function onRequest(context) {
     endType = 'guess';   // 律师猜中
   }
 
-  // 7. 返回结果
   return new Response(JSON.stringify({
-    history: newHistory,
-    aiReply: aiReply,
-    gameOver: gameOver,
-    endType: endType
+    aiReply,
+    gameOver,
+    endType
   }), {
     headers: { 'Content-Type': 'application/json' }
   });
