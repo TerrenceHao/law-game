@@ -24,9 +24,7 @@
 <body>
 <div class="container">
     <div class="header">📋 民事纠纷当事人询问记录</div>
-    <div class="log" id="log">
-        <div class="line announce">当事人已到场，询问开始。</div>
-    </div>
+    <div class="log" id="log"></div>
     <div class="input-area">
         <textarea id="input" rows="1" placeholder="输入你的提问..." maxlength="400"></textarea>
         <button id="sendBtn">发送</button>
@@ -50,41 +48,42 @@
         log.scrollTop = log.scrollHeight;
     }
 
+    // ========== 开局即显示当事人主动问候 ==========
+    const initMessage = "唉，律师您可算来了，我这心里憋屈得很，您问吧……";
+    addLine('ai', initMessage);
+    history.push({ role: 'assistant', content: initMessage });
+
     async function sendMessage() {
         const userText = input.value.trim();
         if (!userText || gameOver) return;
-    
-        // 立即显示用户消息
+
+        // 显示用户消息
         addLine('user', userText);
-        // 更新本地历史（用户消息）
         history.push({ role: 'user', content: userText });
-    
+
         // 禁用输入
         sendBtn.disabled = true;
         input.disabled = true;
         input.value = '';
-    
+
         try {
             const resp = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ history, question: userText })
             });
-    
+
             if (!resp.ok) {
                 const errText = await resp.text();
                 throw new Error(`状态 ${resp.status}: ${errText}`);
             }
-    
+
             const data = await resp.json();
             const aiReply = data.aiReply || '（未收到回复）';
-    
-            // 显示 AI 回复
+
             addLine('ai', aiReply);
-            // 本地历史加入 AI 回复
             history.push({ role: 'assistant', content: aiReply });
-    
-            // 处理结束状态
+
             if (data.gameOver) {
                 gameOver = true;
                 if (data.endType === 'judge') {
@@ -97,7 +96,7 @@
             }
         } catch (e) {
             addLine('error', '错误：' + e.message);
-            history.pop(); // 回滚
+            history.pop(); // 回滚用户消息
         } finally {
             if (!gameOver) {
                 sendBtn.disabled = false;
